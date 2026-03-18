@@ -1,5 +1,5 @@
 import express from 'express';
-import { createSession } from './sessions.js';
+import { createSession, getSession } from './sessions.js';
 import { castVote } from './votes.js';
 
 const app = express();
@@ -16,6 +16,23 @@ app.post('/api/sessions', (req, res) => {
   }
 
   return res.status(200).json({ success: true, data: result.data });
+});
+
+app.get('/api/sessions/:code', (req, res) => {
+  const session = getSession(req.params.code.toUpperCase());
+  if (!session) {
+    return res.status(404).json({ success: false, error: 'Session not found' });
+  }
+
+  return res.json({
+    success: true,
+    data: {
+      code: session.code,
+      title: session.title,
+      items: session.items,
+      voteCount: session.votes.length,
+    },
+  });
 });
 
 app.post('/api/sessions/:code/votes', (req, res) => {
