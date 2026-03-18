@@ -1,50 +1,171 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+  Sync Impact Report
+  ───────────────────
+  Version change: N/A → 1.0.0 (initial adoption)
+  Modified principles: N/A (initial)
+  Added sections: Core Principles (5), Technology Stack, Development Standards,
+                  Governance
+  Removed sections: N/A
+  Templates requiring updates:
+    - .specify/templates/plan-template.md        ✅ compatible (no changes needed)
+    - .specify/templates/spec-template.md         ✅ compatible (no changes needed)
+    - .specify/templates/tasks-template.md        ✅ compatible (no changes needed)
+    - .specify/templates/constitution-template.md  ✅ source template (unchanged)
+  Follow-up TODOs: none
+-->
+
+# The $100 Test Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Simplicity First
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+Every decision MUST favour the simplest solution that satisfies the
+requirement. In-memory data structures (JavaScript `Map`) are the default
+persistence layer. No ORM, no database driver, and no external state store
+may be introduced unless an explicit, documented justification is approved
+through a constitution amendment.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+- YAGNI is enforced: do not build features, abstractions, or extension
+  points that are not required by a current spec.
+- The only production dependency is Express. Adding a new runtime
+  dependency MUST be discussed and justified before adoption.
+- Prefer Node.js built-in modules (`node:crypto`, `node:test`,
+  `node:assert`) over third-party equivalents.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### II. Consistent JSON API Envelope
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+All HTTP JSON responses MUST use the standard envelope shape:
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+```json
+{ "success": true,  "data": { … } }
+{ "success": false, "error": "Human-readable message" }
+```
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- Every success response includes `"success": true` and a `"data"` key.
+- Every error response includes `"success": false` and an `"error"` key
+  containing a human-readable string.
+- HTTP status codes MUST be semantically correct (200 for success, 400 for
+  validation errors, 404 for not-found).
+- No additional top-level keys may be added to the envelope without a
+  constitution amendment.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+### III. Validate at the Boundary
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+All user input MUST be validated at the service-function boundary before
+any state mutation occurs. Validation failures MUST return structured
+error objects that the route handler maps to the JSON envelope.
+
+- Validation logic lives in service modules (`src/sessions.js`,
+  `src/votes.js`), not in route handlers.
+- Service functions return either `{ data }` on success or
+  `{ error, status }` on failure—never throw exceptions for expected
+  validation failures.
+- Session codes MUST be 6-character uppercase alphanumeric strings
+  (`A-Z`, `0-9`), generated randomly, and unique among active sessions.
+
+### IV. Test-Alongside Development
+
+Every feature MUST ship with tests that exercise its happy-path and
+error-path behaviours through the HTTP API using `supertest`.
+
+- Tests use the Node.js built-in test runner (`node --test`).
+- Test files live in `tests/` and are named `<module>.test.js`.
+- Each test file MUST import the Express `app` and use `supertest` to
+  make real HTTP requests—no mocking of request/response objects.
+- Tests MUST be independent: each test (or `describe` block) MUST call
+  the appropriate `clear*()` helper so prior state does not leak.
+- All tests MUST pass before a feature is considered complete.
+
+### V. ES Modules Only
+
+The entire codebase uses ECMAScript modules. CommonJS (`require`,
+`module.exports`) MUST NOT be introduced.
+
+- `package.json` declares `"type": "module"`.
+- All imports use `import`/`export` syntax.
+- Node.js built-in modules MUST use the `node:` protocol prefix
+  (e.g., `import crypto from 'node:crypto'`).
+
+## Technology Stack
+
+| Layer        | Choice                              |
+|--------------|-------------------------------------|
+| Runtime      | Node.js 20                          |
+| Framework    | Express 4.x                         |
+| Frontend     | Vanilla HTML / CSS / JS (static files in `public/`) |
+| Test runner  | `node --test` (built-in)            |
+| HTTP testing | `supertest` (dev dependency only)   |
+| Persistence  | In-memory JavaScript `Map`          |
+| Module system| ES modules (`"type": "module"`)     |
+
+- The server entry point is `src/server.js`. It exports the Express `app`
+  for test consumption and conditionally calls `app.listen()` when run
+  directly.
+- Static assets are served from the `public/` directory via
+  `express.static`.
+- The default port is `3000`, overridable via the `PORT` environment
+  variable.
+
+## Development Standards
+
+### File Organisation
+
+```
+src/
+  server.js          # Express app, route mounting, static middleware
+  sessions.js        # Session creation, retrieval, storage
+  votes.js           # Vote casting and validation
+public/
+  index.html         # Single-page frontend (and supporting assets)
+tests/
+  sessions.test.js   # HTTP-level tests for session endpoints
+  votes.test.js      # HTTP-level tests for vote endpoints
+specs/
+  ###-feature-name/
+    spec.md           # Feature specification
+```
+
+- Each domain concern (sessions, votes, results, etc.) gets its own
+  module in `src/` and a corresponding test file in `tests/`.
+- Route registration stays in `server.js`; business logic stays in
+  domain modules.
+- Feature specs live under `specs/` in numbered directories.
+
+### Naming Conventions
+
+- Files: `kebab-case.js`
+- Functions: `camelCase`
+- Constants: `UPPER_SNAKE_CASE`
+- Test files: `<module>.test.js`
+- API routes: `/api/<resource>` (plural nouns, lowercase)
+
+### Error Handling
+
+- Service functions MUST return `{ error, status }` for expected failures
+  (validation, not-found). They MUST NOT throw.
+- Unexpected errors (bugs) may throw and will be caught by Express
+  default error handling.
+- Error messages MUST be user-facing, concise, and free of internal
+  implementation details.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution is the authoritative source of architectural and
+process decisions for The $100 Test project. All feature specs, plans,
+and code changes MUST comply with the principles defined here.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+- **Amendments**: Any change to a principle or addition of a new
+  principle MUST be documented with a rationale, reflected in a version
+  bump, and propagated to dependent templates.
+- **Versioning**: The constitution follows semantic versioning—
+  MAJOR for backward-incompatible principle removals or redefinitions,
+  MINOR for new principles or materially expanded guidance, PATCH for
+  clarifications and wording fixes.
+- **Compliance**: Feature specs and implementation plans MUST include a
+  Constitution Check section verifying alignment with these principles.
+- **Complexity justification**: Any deviation from Simplicity First MUST
+  be recorded in the plan's Complexity Tracking table with a rejected-
+  alternative explanation.
+
+**Version**: 1.0.0 | **Ratified**: 2026-03-18 | **Last Amended**: 2026-03-18
