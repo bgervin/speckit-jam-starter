@@ -35,7 +35,7 @@ During the AI Forward Hands-on Lab, you'll use **SpecKit + GitHub Copilot CLI** 
 3. **Close Session** — Lock voting when done
 4. **Export Results** — Download results as CSV
 
-Follow the [Hands-on Lab instructions](https://YOUR_ORG.github.io/speckit-jam-instructor/) for step-by-step guidance.
+Follow the [Hands-on Lab instructions](https://bgervin.github.io/speckit-jam-instructor/) for step-by-step guidance.
 
 ## Project Structure
 
