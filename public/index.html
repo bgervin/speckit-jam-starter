@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The $100 Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; color: #1a1a2e; background: #f8f9fa; }
+    h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .subtitle { color: #6c757d; font-size: 1.1rem; margin-bottom: 2rem; }
+    .card { background: white; border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    h2 { font-size: 1.4rem; margin-bottom: 1rem; color: #2d3748; }
+    label { display: block; font-weight: 600; margin-bottom: 0.5rem; }
+    input, textarea { width: 100%; padding: 0.75rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem; }
+    input:focus, textarea:focus { outline: none; border-color: #4f46e5; }
+    button { background: #4f46e5; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600; }
+    button:hover { background: #4338ca; }
+    .result { padding: 1rem; background: #f0fdf4; border-radius: 8px; margin-top: 1rem; }
+    .result code { font-size: 1.5rem; font-weight: 700; color: #16a34a; }
+    .error { padding: 1rem; background: #fef2f2; border-radius: 8px; margin-top: 1rem; color: #dc2626; }
+    .info { padding: 1rem; background: #eff6ff; border-radius: 8px; margin-bottom: 1rem; color: #1e40af; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>💰 The $100 Test</h1>
+  <p class="subtitle">A prioritization exercise for teams — allocate $100 across competing options to reveal true priorities.</p>
+
+  <div class="info">
+    <strong>How it works:</strong> Create a session with items to vote on, share the session code with your team, and everyone distributes $100 across the options. The items that get the most funding are your top priorities.
+  </div>
+
+  <div class="card">
+    <h2>Create a New Session</h2>
+    <label for="title">Session Title</label>
+    <input type="text" id="title" placeholder="e.g., Q3 Feature Prioritization">
+    <label for="items">Items to Vote On (one per line)</label>
+    <textarea id="items" rows="6" placeholder="Dark mode&#10;Export to PDF&#10;Mobile app&#10;API rate limiting&#10;User analytics dashboard"></textarea>
+    <button onclick="createSession()">Create Session</button>
+    <div id="createResult"></div>
+  </div>
+
+  <div class="card">
+    <h2>Join a Session &amp; Vote</h2>
+    <label for="code">Session Code</label>
+    <input type="text" id="code" placeholder="e.g., A7X3K9" maxlength="6" style="text-transform: uppercase;">
+    <button onclick="loadSession()">Load Session</button>
+    <div id="voteForm"></div>
+  </div>
+
+  <script>
+    async function createSession() {
+      const title = document.getElementById('title').value.trim();
+      const items = document.getElementById('items').value.split('\n').map(s => s.trim()).filter(Boolean);
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, items }),
+      });
+      const data = await res.json();
+      const el = document.getElementById('createResult');
+      if (data.success) {
+        el.innerHTML = `<div class="result">Session created! Share this code: <code>${data.data.code}</code></div>`;
+      } else {
+        el.innerHTML = `<div class="error">${data.error}</div>`;
+      }
+    }
+
+    let currentSession = null;
+    async function loadSession() {
+      const code = document.getElementById('code').value.trim().toUpperCase();
+      const res = await fetch(`/api/sessions/${code}`);
+      const data = await res.json();
+      const el = document.getElementById('voteForm');
+      if (!data.success) { el.innerHTML = `<div class="error">${data.error}</div>`; return; }
+      currentSession = data.data;
+      let html = `<div style="margin-top:1rem"><h3>${data.data.title}</h3>`;
+      html += `<p style="color:#6c757d;margin:0.5rem 0">Distribute exactly $100 across these items:</p>`;
+      html += `<label>Your Name</label><input type="text" id="voterName" placeholder="Your name">`;
+      data.data.items.forEach(item => {
+        html += `<label>${item}</label><input type="number" class="alloc" data-item="${item}" min="0" max="100" value="0" onchange="updateTotal()">`;
+      });
+      html += `<p id="totalDisplay" style="font-weight:700;margin:0.5rem 0">Total: $0</p>`;
+      html += `<button onclick="submitVote('${code}')">Submit Vote</button>`;
+      html += `<div id="voteResult"></div></div>`;
+      el.innerHTML = html;
+    }
+
+    function updateTotal() {
+      const inputs = document.querySelectorAll('.alloc');
+      let total = 0;
+      inputs.forEach(i => total += parseInt(i.value) || 0);
+      const display = document.getElementById('totalDisplay');
+      display.textContent = `Total: $${total}`;
+      display.style.color = total === 100 ? '#16a34a' : total > 100 ? '#dc2626' : '#1a1a2e';
+    }
+
+    async function submitVote(code) {
+      const voterName = document.getElementById('voterName').value.trim();
+      const allocations = {};
+      document.querySelectorAll('.alloc').forEach(i => {
+        allocations[i.dataset.item] = parseInt(i.value) || 0;
+      });
+      const res = await fetch(`/api/sessions/${code}/votes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voterName, allocations }),
+      });
+      const data = await res.json();
+      const el = document.getElementById('voteResult');
+      if (data.success) {
+        el.innerHTML = `<div class="result">Vote submitted! ✅</div>`;
+      } else {
+        el.innerHTML = `<div class="error">${data.error}</div>`;
+      }
+    }
+  </script>
+</body>
+</html>
