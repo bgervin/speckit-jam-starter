@@ -1,6 +1,18 @@
-# The $100 Test — Starter Repo
+# The $100 Test — SpecKit Hands-on Lab Starter
+
+> **📋 This repo is part of the [SpecKit Hands-on Lab](https://bgervin.github.io/speckit-jam-instructor/).** 
+> Head there for the full step-by-step workshop instructions.
 
 A web app for teams to run **$100 prioritization exercises** — a well-known PM technique where participants allocate a hypothetical $100 across competing options to surface true priorities.
+
+## 🚀 Workshop Instructions
+
+**👉 [Open the Hands-on Lab Guide](https://bgervin.github.io/speckit-jam-instructor/)**
+
+The guide walks you through:
+1. Forking and setting up this repo
+2. Using **SpecKit + Copilot CLI** to add new features via spec-driven development
+3. Running the full workflow: `/speckit.specify` → `/speckit.clarify` → `/speckit.plan` → `/speckit.tasks` → `/speckit.implement`
 
 ## Quick Start
 
